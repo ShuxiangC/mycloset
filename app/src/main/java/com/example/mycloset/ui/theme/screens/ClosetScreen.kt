@@ -26,9 +26,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.example.mycloset.data.AppRepository
 import com.example.mycloset.data.ClothingItem
 import com.example.mycloset.data.CategoryCount
 import kotlinx.coroutines.launch
+import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -41,6 +43,8 @@ fun ClosetScreen(repository: AppRepository) {
     val categories by repository.getAllCategories().collectAsState(initial = emptyList())
     val categoryCounts by repository.getCategoryCounts().collectAsState(initial = emptyList())
     val filteredItems by repository.getItemsByCategory(selectedCategory).collectAsState(initial = emptyList())
+
+    val scope = rememberCoroutineScope()
 
     // Create category display list with counts
     val categoryDisplayList = remember(categories, categoryCounts) {
@@ -83,7 +87,6 @@ fun ClosetScreen(repository: AppRepository) {
                 ClothingItemCard(
                     item = item,
                     onDelete = {
-                        val scope = rememberCoroutineScope()
                         scope.launch {
                             repository.removeClothingItem(item)
                         }
@@ -302,6 +305,7 @@ fun AddItemDialog(
                         scope.launch {
                             repository.addClothingItem(
                                 ClothingItem(
+                                    id = UUID.randomUUID().toString(),
                                     imageUri = uri.toString(),
                                     category = selectedCategory,
                                     name = itemName
