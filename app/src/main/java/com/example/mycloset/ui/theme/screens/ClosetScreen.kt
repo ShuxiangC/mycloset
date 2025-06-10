@@ -26,7 +26,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
-import com.example.mycloset.data.AppRepository
 import com.example.mycloset.data.ClothingItem
 import com.example.mycloset.data.CategoryCount
 import kotlinx.coroutines.launch

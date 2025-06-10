@@ -4,28 +4,25 @@ import androidx.room.*
 import kotlinx.coroutines.flow.Flow
 
 @Dao
-interface OutfitDao {
-    @Query("SELECT * FROM outfits")
-    fun getAllOutfits(): Flow<List<OutfitEntity>>
+interface ClothingItemDao {
+    @Query("SELECT * FROM clothing_items")
+    fun getAllClothingItems(): Flow<List<ClothingItemEntity>>
+
+    @Query("SELECT * FROM clothing_items WHERE category = :category")
+    fun getItemsByCategory(category: String): Flow<List<ClothingItemEntity>>
+
+    @Query("SELECT category, COUNT(*) as count FROM clothing_items GROUP BY category")
+    fun getCategoryCounts(): Flow<List<CategoryCount>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertOutfit(outfit: OutfitEntity)
+    suspend fun insertClothingItem(item: ClothingItemEntity)
 
     @Update
-    suspend fun updateOutfit(outfit: OutfitEntity)
+    suspend fun updateClothingItem(item: ClothingItemEntity)
 
     @Delete
-    suspend fun deleteOutfit(outfit: OutfitEntity)
+    suspend fun deleteClothingItem(item: ClothingItemEntity)
 
-    @Query("SELECT * FROM outfit_items WHERE outfitId = :outfitId")
-    suspend fun getOutfitItems(outfitId: String): List<OutfitItemEntity>
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertOutfitItems(items: List<OutfitItemEntity>)
-
-    @Query("DELETE FROM outfit_items WHERE outfitId = :outfitId")
-    suspend fun deleteOutfitItems(outfitId: String)
-
-    @Query("SELECT * FROM outfits WHERE id = :id")
-    suspend fun getOutfitById(id: String): OutfitEntity?
+    @Query("SELECT * FROM clothing_items WHERE id = :id")
+    suspend fun getClothingItemById(id: String): ClothingItemEntity?
 }

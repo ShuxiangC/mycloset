@@ -13,6 +13,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -21,7 +22,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import com.example.mycloset.data.AppRepository
 import com.example.mycloset.data.ClothingItem
 import com.example.mycloset.data.Outfit
 
@@ -29,6 +29,8 @@ import com.example.mycloset.data.Outfit
 @Composable
 fun LookbookScreen(repository: AppRepository) {
     var showCreateDialog by remember { mutableStateOf(false) }
+    var showEditDialog by remember { mutableStateOf(false) }
+    var outfitToEdit by remember { mutableStateOf<Outfit?>(null) }
 
     Column(
         modifier = Modifier
@@ -49,7 +51,11 @@ fun LookbookScreen(repository: AppRepository) {
             items(repository.outfits) { outfit ->
                 OutfitCard(
                     outfit = outfit,
-                    onDelete = { repository.removeOutfit(outfit) }
+                    onDelete = { repository.removeOutfit(outfit) },
+                    onEdit = {
+                        outfitToEdit = outfit
+                        showEditDialog = true
+                    }
                 )
             }
         }
@@ -68,13 +74,25 @@ fun LookbookScreen(repository: AppRepository) {
             onDismiss = { showCreateDialog = false }
         )
     }
+
+    if (showEditDialog && outfitToEdit != null) {
+        EditOutfitDialog(
+            repository = repository,
+            outfit = outfitToEdit!!,
+            onDismiss = {
+                showEditDialog = false
+                outfitToEdit = null
+            }
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OutfitCard(
     outfit: Outfit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onEdit: () -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth()
@@ -91,41 +109,50 @@ fun OutfitCard(
                     text = outfit.name,
                     style = MaterialTheme.typography.headlineSmall
                 )
-                IconButton(onClick = onDelete) {
-                    Icon(
-                        Icons.Filled.Delete,
-                        contentDescription = "Delete Outfit",
-                        tint = MaterialTheme.colorScheme.error
-                    )
+                Row {
+                    IconButton(onClick = onEdit) {
+                        Icon(
+                            Icons.Filled.Edit,
+                            contentDescription = "Edit Outfit",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    IconButton(onClick = onDelete) {
+                        Icon(
+                            Icons.Filled.Delete,
+                            contentDescription = "Delete Outfit",
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                    }
                 }
             }
 
-            // Outfit items and model photo at the same size
+            // Outfit items and model photo at the same size (changed to 150.dp)
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.padding(top = 8.dp)
             ) {
-                // Model image if available (same size as clothing items)
+                // Model image if available (changed size to 150.dp)
                 outfit.modelImageUri?.let { uri ->
                     item {
                         AsyncImage(
                             model = uri,
                             contentDescription = "Model photo",
                             modifier = Modifier
-                                .size(200.dp)
+                                .size(150.dp)
                                 .clip(RoundedCornerShape(8.dp)),
                             contentScale = ContentScale.Crop
                         )
                     }
                 }
 
-                // Outfit items
+                // Outfit items (changed size to 150.dp)
                 items(outfit.items) { item ->
                     AsyncImage(
                         model = item.imageUri,
                         contentDescription = "Outfit item",
                         modifier = Modifier
-                            .size(200.dp)
+                            .size(150.dp)
                             .clip(RoundedCornerShape(8.dp)),
                         contentScale = ContentScale.Crop
                     )
@@ -226,6 +253,121 @@ fun CreateOutfitDialog(
                 enabled = selectedItems.isNotEmpty()
             ) {
                 Text("Create")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun EditOutfitDialog(
+    repository: AppRepository,
+    outfit: Outfit,
+    onDismiss: () -> Unit
+) {
+    var outfitName by remember { mutableStateOf(outfit.name) }
+    var selectedItems by remember { mutableStateOf(outfit.items.toSet()) }
+    var modelImageUri by remember { mutableStateOf<Uri?>(outfit.modelImageUri?.let { Uri.parse(it) }) }
+
+    val launcher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        modelImageUri = uri
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Edit Outfit") },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                OutlinedTextField(
+                    value = outfitName,
+                    onValueChange = { outfitName = it },
+                    label = { Text("Outfit Name") }
+                )
+
+                Text("Select Items:")
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(3),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier.height(200.dp)
+                ) {
+                    items(repository.clothingItems) { item ->
+                        val isSelected = selectedItems.contains(item)
+                        Card(
+                            onClick = {
+                                selectedItems = if (isSelected) {
+                                    selectedItems - item
+                                } else {
+                                    selectedItems + item
+                                }
+                            },
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (isSelected)
+                                    MaterialTheme.colorScheme.primaryContainer
+                                else
+                                    MaterialTheme.colorScheme.surface
+                            )
+                        ) {
+                            AsyncImage(
+                                model = item.imageUri,
+                                contentDescription = "Item",
+                                modifier = Modifier
+                                    .size(60.dp)
+                                    .clip(RoundedCornerShape(4.dp)),
+                                contentScale = ContentScale.Crop
+                            )
+                        }
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = { launcher.launch("image/*") },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(if (modelImageUri != null) "Change Photo" else "Add Model Photo")
+                    }
+
+                    if (modelImageUri != null) {
+                        OutlinedButton(
+                            onClick = { modelImageUri = null },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Remove Photo")
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    val finalName = if (outfitName.isBlank()) "Untitled Outfit" else outfitName
+                    if (selectedItems.isNotEmpty()) {
+                        val updatedOutfit = outfit.copy(
+                            name = finalName,
+                            items = selectedItems.toList(),
+                            modelImageUri = modelImageUri?.toString()
+                        )
+                        repository.updateOutfit(outfit, updatedOutfit)
+                        onDismiss()
+                    }
+                },
+                enabled = selectedItems.isNotEmpty()
+            ) {
+                Text("Update")
             }
         },
         dismissButton = {
