@@ -2,7 +2,7 @@ package com.example.mycloset.ui.theme.screens
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items  // This is the key import!
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
@@ -10,13 +10,17 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-
+import com.example.mycloset.data.AppRepository
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CategoriesScreen(repository: AppRepository) {
     var showAddDialog by remember { mutableStateOf(false) }
     var editingCategory by remember { mutableStateOf<String?>(null) }
+
+    val categories by repository.getAllCategories().collectAsState(initial = emptyList())
+    val coroutineScope = rememberCoroutineScope()
 
     Column(
         modifier = Modifier
@@ -33,7 +37,7 @@ fun CategoriesScreen(repository: AppRepository) {
             verticalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.weight(1f)
         ) {
-            items(repository.categories) { category ->
+            items(categories) { category ->
                 Card(
                     modifier = Modifier.fillMaxWidth()
                 ) {
@@ -56,7 +60,11 @@ fun CategoriesScreen(repository: AppRepository) {
                                 Text("Edit")
                             }
                             TextButton(
-                                onClick = { repository.removeCategory(category) }
+                                onClick = {
+                                    coroutineScope.launch {
+                                        repository.removeCategory(category)
+                                    }
+                                }
                             ) {
                                 Text("Delete", color = MaterialTheme.colorScheme.error)
                             }
@@ -77,7 +85,9 @@ fun CategoriesScreen(repository: AppRepository) {
     if (showAddDialog) {
         AddCategoryDialog(
             onAdd = { category ->
-                repository.addCategory(category)
+                coroutineScope.launch {
+                    repository.addCategory(category)
+                }
                 showAddDialog = false
             },
             onDismiss = { showAddDialog = false }
@@ -88,7 +98,9 @@ fun CategoriesScreen(repository: AppRepository) {
         EditCategoryDialog(
             currentCategory = category,
             onUpdate = { newCategory ->
-                repository.updateCategory(category, newCategory)
+                coroutineScope.launch {
+                    repository.updateCategory(category, newCategory)
+                }
                 editingCategory = null
             },
             onDismiss = { editingCategory = null }
