@@ -1,11 +1,17 @@
 package com.example.mycloset.data
 
+import android.content.Context
+import android.net.Uri
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import com.example.mycloset.utils.ImageUtils
 import java.util.*
 
-class AppRepository(private val database: AppDatabase) {
+class AppRepository(
+    private val database: AppDatabase,
+    private val context: Context // Add context parameter
+) {
     private val clothingItemDao = database.clothingItemDao()
     private val outfitDao = database.outfitDao()
     private val categoryDao = database.categoryDao()
@@ -38,16 +44,65 @@ class AppRepository(private val database: AppDatabase) {
         }
     }
 
-    suspend fun addClothingItem(item: ClothingItem) {
-        clothingItemDao.insertClothingItem(item.toEntity())
+    suspend fun addClothingItem(item: ClothingItem): Boolean {
+        return try {
+            // Copy image to internal storage if it's a content URI
+            val finalImageUri = if (item.imageUri.startsWith("content://")) {
+                ImageUtils.copyImageToInternalStorage(context, Uri.parse(item.imageUri))
+                    ?: return false // Return false if image copy failed
+            } else {
+                item.imageUri
+            }
+
+            val itemWithInternalUri = item.copy(imageUri = finalImageUri)
+            clothingItemDao.insertClothingItem(itemWithInternalUri.toEntity())
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
     }
 
-    suspend fun updateClothingItem(item: ClothingItem) {
-        clothingItemDao.updateClothingItem(item.toEntity())
+    suspend fun updateClothingItem(oldItem: ClothingItem, newItem: ClothingItem): Boolean {
+        return try {
+            // If image URI changed, copy new image and delete old one
+            val finalImageUri = if (newItem.imageUri != oldItem.imageUri &&
+                newItem.imageUri.startsWith("content://")) {
+                val newInternalUri = ImageUtils.copyImageToInternalStorage(context, Uri.parse(newItem.imageUri))
+                    ?: return false
+
+                // Delete old image if it exists in internal storage
+                if (oldItem.imageUri.startsWith("/")) {
+                    ImageUtils.deleteImageFromInternalStorage(oldItem.imageUri)
+                }
+
+                newInternalUri
+            } else {
+                newItem.imageUri
+            }
+
+            val itemWithInternalUri = newItem.copy(imageUri = finalImageUri)
+            clothingItemDao.updateClothingItem(itemWithInternalUri.toEntity())
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
     }
 
-    suspend fun removeClothingItem(item: ClothingItem) {
-        clothingItemDao.deleteClothingItem(item.toEntity())
+    suspend fun removeClothingItem(item: ClothingItem): Boolean {
+        return try {
+            clothingItemDao.deleteClothingItem(item.toEntity())
+
+            // Delete associated image file
+            if (item.imageUri.startsWith("/")) {
+                ImageUtils.deleteImageFromInternalStorage(item.imageUri)
+            }
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
     }
 
     suspend fun getClothingItemById(id: String): ClothingItem? {
@@ -93,7 +148,19 @@ class AppRepository(private val database: AppDatabase) {
     }
 
     suspend fun addOutfit(outfit: Outfit) {
-        outfitDao.insertOutfit(outfit.toEntity())
+        // Handle model image URI if present
+        val finalModelImageUri = outfit.modelImageUri?.let { uri ->
+            if (uri.startsWith("content://")) {
+                ImageUtils.copyImageToInternalStorage(context, Uri.parse(uri))
+                    ?: uri // Keep original if copy fails
+            } else {
+                uri
+            }
+        }
+
+        val outfitWithInternalUri = outfit.copy(modelImageUri = finalModelImageUri)
+
+        outfitDao.insertOutfit(outfitWithInternalUri.toEntity())
         val outfitItems = outfit.items.map { item ->
             OutfitItemEntity(
                 id = UUID.randomUUID().toString(),
@@ -105,7 +172,19 @@ class AppRepository(private val database: AppDatabase) {
     }
 
     suspend fun updateOutfit(outfit: Outfit) {
-        outfitDao.updateOutfit(outfit.toEntity())
+        // Handle model image URI if present
+        val finalModelImageUri = outfit.modelImageUri?.let { uri ->
+            if (uri.startsWith("content://")) {
+                ImageUtils.copyImageToInternalStorage(context, Uri.parse(uri))
+                    ?: uri // Keep original if copy fails
+            } else {
+                uri
+            }
+        }
+
+        val outfitWithInternalUri = outfit.copy(modelImageUri = finalModelImageUri)
+
+        outfitDao.updateOutfit(outfitWithInternalUri.toEntity())
         outfitDao.deleteOutfitItems(outfit.id)
         val outfitItems = outfit.items.map { item ->
             OutfitItemEntity(
@@ -119,6 +198,13 @@ class AppRepository(private val database: AppDatabase) {
 
     suspend fun removeOutfit(outfit: Outfit) {
         outfitDao.deleteOutfit(outfit.toEntity())
+
+        // Delete model image if it exists in internal storage
+        outfit.modelImageUri?.let { uri ->
+            if (uri.startsWith("/")) {
+                ImageUtils.deleteImageFromInternalStorage(uri)
+            }
+        }
     }
 
     suspend fun getOutfitById(id: String): Outfit? {

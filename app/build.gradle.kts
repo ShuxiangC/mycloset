@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    id("kotlin-kapt") // Add this for Room annotation processing
 }
 
 android {
@@ -51,7 +52,12 @@ dependencies {
     implementation(libs.androidx.navigation.common.android)
     implementation("androidx.compose.material3:material3:1.2.1")
     implementation("com.google.android.material:material:1.11.0")
+    implementation("io.coil-kt:coil-compose:2.4.0")
+
+    // Room dependencies
+    implementation("androidx.room:room-runtime:2.7.1")
     implementation("androidx.room:room-ktx:2.7.1")
+    kapt("androidx.room:room-compiler:2.7.1") // Add this line for Room annotation processor
 
     // Testing
     testImplementation("junit:junit:4.13.2")
