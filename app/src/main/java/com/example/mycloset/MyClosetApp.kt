@@ -22,9 +22,8 @@ import com.example.mycloset.ui.theme.screens.*
 fun MyClosetApp() {
     val context = LocalContext.current
     val navController = rememberNavController()
-    //val repository = remember { AppRepository() }
     val database = remember { AppDatabase.getDatabase(context) }
-    val repository = remember { AppRepository(database) }
+    val repository = remember { AppRepository(database, context) } // Added context parameter
 
     Scaffold(
         bottomBar = {
