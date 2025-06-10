@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+
+    <!-- MyCloset Custom Colors -->
+    <color name="closet_primary">#FF8B5A3C</color>
+    <color name="closet_primary_variant">#FF6D4428</color>
+    <color name="closet_secondary">#FFDEB887</color>
+    <color name="closet_secondary_variant">#FFC8A882</color>
+    <color name="closet_background">#FFFFFBFF</color>
+</resources>
