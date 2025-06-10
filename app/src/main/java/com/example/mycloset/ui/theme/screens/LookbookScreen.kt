@@ -8,7 +8,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items  // This is the key import!
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -22,8 +22,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import com.example.mycloset.data.AppRepository
 import com.example.mycloset.data.ClothingItem
 import com.example.mycloset.data.Outfit
+import kotlinx.coroutines.launch
+import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -31,6 +34,12 @@ fun LookbookScreen(repository: AppRepository) {
     var showCreateDialog by remember { mutableStateOf(false) }
     var showEditDialog by remember { mutableStateOf(false) }
     var outfitToEdit by remember { mutableStateOf<Outfit?>(null) }
+
+    // Collect outfits from Flow
+    val outfits by repository.getAllOutfits().collectAsState(initial = emptyList())
+    val clothingItems by repository.getAllClothingItems().collectAsState(initial = emptyList())
+
+    val scope = rememberCoroutineScope()
 
     Column(
         modifier = Modifier
@@ -48,10 +57,14 @@ fun LookbookScreen(repository: AppRepository) {
             verticalArrangement = Arrangement.spacedBy(16.dp),
             modifier = Modifier.weight(1f)
         ) {
-            items(repository.outfits) { outfit ->
+            items(outfits) { outfit ->
                 OutfitCard(
                     outfit = outfit,
-                    onDelete = { repository.removeOutfit(outfit) },
+                    onDelete = {
+                        scope.launch {
+                            repository.removeOutfit(outfit)
+                        }
+                    },
                     onEdit = {
                         outfitToEdit = outfit
                         showEditDialog = true
@@ -71,6 +84,7 @@ fun LookbookScreen(repository: AppRepository) {
     if (showCreateDialog) {
         CreateOutfitDialog(
             repository = repository,
+            clothingItems = clothingItems,
             onDismiss = { showCreateDialog = false }
         )
     }
@@ -79,6 +93,7 @@ fun LookbookScreen(repository: AppRepository) {
         EditOutfitDialog(
             repository = repository,
             outfit = outfitToEdit!!,
+            clothingItems = clothingItems,
             onDismiss = {
                 showEditDialog = false
                 outfitToEdit = null
@@ -127,12 +142,12 @@ fun OutfitCard(
                 }
             }
 
-            // Outfit items and model photo at the same size (changed to 150.dp)
+            // Outfit items and model photo at the same size
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.padding(top = 8.dp)
             ) {
-                // Model image if available (changed size to 150.dp)
+                // Model image if available
                 outfit.modelImageUri?.let { uri ->
                     item {
                         AsyncImage(
@@ -146,7 +161,7 @@ fun OutfitCard(
                     }
                 }
 
-                // Outfit items (changed size to 150.dp)
+                // Outfit items
                 items(outfit.items) { item ->
                     AsyncImage(
                         model = item.imageUri,
@@ -166,11 +181,14 @@ fun OutfitCard(
 @Composable
 fun CreateOutfitDialog(
     repository: AppRepository,
+    clothingItems: List<ClothingItem>,
     onDismiss: () -> Unit
 ) {
     var outfitName by remember { mutableStateOf("") }
     var selectedItems by remember { mutableStateOf(setOf<ClothingItem>()) }
     var modelImageUri by remember { mutableStateOf<Uri?>(null) }
+
+    val scope = rememberCoroutineScope()
 
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -198,7 +216,7 @@ fun CreateOutfitDialog(
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                     modifier = Modifier.height(200.dp)
                 ) {
-                    items(repository.clothingItems) { item ->
+                    items(clothingItems) { item ->
                         val isSelected = selectedItems.contains(item)
                         Card(
                             onClick = {
@@ -240,14 +258,17 @@ fun CreateOutfitDialog(
                 onClick = {
                     val finalName = if (outfitName.isBlank()) "Untitled Outfit" else outfitName
                     if (selectedItems.isNotEmpty()) {
-                        repository.addOutfit(
-                            Outfit(
-                                name = finalName,
-                                items = selectedItems.toList(),
-                                modelImageUri = modelImageUri?.toString()
+                        scope.launch {
+                            repository.addOutfit(
+                                Outfit(
+                                    id = UUID.randomUUID().toString(),
+                                    name = finalName,
+                                    items = selectedItems.toList(),
+                                    modelImageUri = modelImageUri?.toString()
+                                )
                             )
-                        )
-                        onDismiss()
+                            onDismiss()
+                        }
                     }
                 },
                 enabled = selectedItems.isNotEmpty()
@@ -268,11 +289,14 @@ fun CreateOutfitDialog(
 fun EditOutfitDialog(
     repository: AppRepository,
     outfit: Outfit,
+    clothingItems: List<ClothingItem>,
     onDismiss: () -> Unit
 ) {
     var outfitName by remember { mutableStateOf(outfit.name) }
     var selectedItems by remember { mutableStateOf(outfit.items.toSet()) }
     var modelImageUri by remember { mutableStateOf<Uri?>(outfit.modelImageUri?.let { Uri.parse(it) }) }
+
+    val scope = rememberCoroutineScope()
 
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -300,7 +324,7 @@ fun EditOutfitDialog(
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                     modifier = Modifier.height(200.dp)
                 ) {
-                    items(repository.clothingItems) { item ->
+                    items(clothingItems) { item ->
                         val isSelected = selectedItems.contains(item)
                         Card(
                             onClick = {
@@ -361,8 +385,10 @@ fun EditOutfitDialog(
                             items = selectedItems.toList(),
                             modelImageUri = modelImageUri?.toString()
                         )
-                        repository.updateOutfit(outfit, updatedOutfit)
-                        onDismiss()
+                        scope.launch {
+                            repository.updateOutfit(updatedOutfit)
+                            onDismiss()
+                        }
                     }
                 },
                 enabled = selectedItems.isNotEmpty()
